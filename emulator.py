@@ -7,7 +7,7 @@ Instruction Set
 0x40    DIV TARGET  SOURCE
 0x50    INC TARGET  BLANK
 0x60    JMP TARGET  BLANK
-0x70    JZ  TARGET  BLANK
+0x70    JNZ  TARGET  BLANK
 0x80    MOV TARGET  SOURCE
 0x90    MUL TARGET  SOURCE
 0xA0    NEG TARGET  BLANK
@@ -26,7 +26,7 @@ OPCODE_MAP = {
     "DIV": 0x40,
     "INC": 0x50,
     "JMP": 0x60,
-    "JZ": 0x70,
+    "JNZ": 0x70,
     "MOV": 0x80,
     "MUL": 0x90,
     "NEG": 0xA0,
@@ -44,7 +44,7 @@ REVERSE_OPCODE_MAP = {
     0x40: "DIV",
     0x50: "INC",
     0x60: "JMP",
-    0x70: "JZ",
+    0x70: "JNZ",
     0x80: "MOV",
     0x90: "MUL",
     0xA0: "NEG",
@@ -100,7 +100,7 @@ class Emulator(object):
                     "DIV": self.OP_DIV,
                     "INC": self.OP_INC,
                     "JMP": self.OP_JMP,
-                    "JZ": self.OP_JZ,
+                    "JNZ": self.OP_JNZ,
                     "MOV": self.OP_MOV,
                     "MUL": self.OP_MUL,
                     "NEG": self.OP_NEG,
@@ -136,9 +136,9 @@ class Emulator(object):
     def OP_JMP(self, target, source):
         self.memory[REGISTER_MAP["PC"]] = self.memory[target] - 3
 
-    def OP_JZ(self, target, source):
-        if self.memory[target] == 0:
-            self.memory[REGISTER_MAP["PC"]] = self.memory[target] - 3
+    def OP_JNZ(self, target, source):
+        if self.memory[target]:
+            self.memory[REGISTER_MAP["PC"]] = self.memory[source] - 3
 
     def OP_MOV(self, target, source):
         self.memory[target] = self.memory[source]

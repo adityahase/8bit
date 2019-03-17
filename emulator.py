@@ -84,35 +84,79 @@ class Emulator(object):
 
     def run(self):
         program_counter = REGISTER_MAP["PC"]
-        print(self.state())
         while True:
-            pointer = self.memory[program_counter]
-            instruction = self.memory[pointer: pointer + 3]
-            opcode, target, source, target_mask, source_mask = self.decode(instruction)
-            function = {
-                "NOP": self.OP_NOP,
-                "ADD": self.OP_ADD,
-                "AND": self.OP_AND,
-                "DEC": self.OP_DEC,
-                "DIV": self.OP_DIV,
-                "INC": self.OP_INC,
-                "JMP": self.OP_JMP,
-                "JZ": self.OP_JZ,
-                "MOV": self.OP_MOV,
-                "MUL": self.OP_MUL,
-                "NEG": self.OP_NEG,
-                "SUB": self.OP_SUB,
-                "OR": self.OP_OR,
-                "XOR": self.OP_XOR,
-                "HLT": self.OP_HLT
-            }[REVERSE_OPCODE_MAP[opcode]]
-            function(self.resolve(target, target_mask), self.resolve(source, source_mask))
-            self.memory[program_counter] += 3
-            yield self.state()
+            try:
+                pointer = self.memory[program_counter]
+                instruction = self.memory[pointer: pointer + 3]
+                opcode, target, source, target_mask, source_mask = self.decode(instruction)
+                function = {
+                    "NOP": self.OP_NOP,
+                    "ADD": self.OP_ADD,
+                    "AND": self.OP_AND,
+                    "DEC": self.OP_DEC,
+                    "DIV": self.OP_DIV,
+                    "INC": self.OP_INC,
+                    "JMP": self.OP_JMP,
+                    "JZ": self.OP_JZ,
+                    "MOV": self.OP_MOV,
+                    "MUL": self.OP_MUL,
+                    "NEG": self.OP_NEG,
+                    "SUB": self.OP_SUB,
+                    "OR": self.OP_OR,
+                    "XOR": self.OP_XOR,
+                    "HLT": self.OP_HLT
+                }[REVERSE_OPCODE_MAP[opcode]]
+                function(self.resolve(target, target_mask), self.resolve(source, source_mask))
+                self.memory[program_counter] += 3
+                yield self.state()
+            except StopIteration:
+                return
 
     def OP_NOP(self, target, source):
         pass
 
+    def OP_ADD(self, target, source):
+        self.memory[target] += self.memory[source]
+
+    def OP_AND(self, target, source):
+        self.memory[target] &= self.memory[source]
+
+    def OP_DEC(self, target, source):
+        self.memory[target] -= 1
+
+    def OP_DIV(self, target, source):
+        self.memory[target], self.memory[source] = divmod(self.memory[target], self.memory[source])
+
+    def OP_INC(self, target, source):
+        self.memory[target] += 1
+
+    def OP_JMP(self, target, source):
+        self.memory[REGISTER_MAP["PC"]] = self.memory[target] - 3
+
+    def OP_JZ(self, target, source):
+        if self.memory[target] == 0:
+            self.memory[REGISTER_MAP["PC"]] = self.memory[target] - 3
+
+    def OP_MOV(self, target, source):
+        self.memory[target] = self.memory[source]
+
+    def OP_MUL(self, target, source):
+        self.memory[target] *= self.memory[source]
+
+    def OP_NEG(self, target, source):
+        self.memory[target] = -self.memory[target]
+
+    def OP_SUB(self, target, source):
+        self.memory[target] -= self.memory[source]
+
+    def OP_OR(self, target, source):
+        self.memory[target] |= self.memory[source]
+
+    def OP_XOR(self, target, source):
+        self.memory[target] ^= self.memory[source]
+
+    def OP_HLT(self, target, source):
+        raise StopIteration
 
     def resolve(self, value, mask):
         return {
@@ -146,7 +190,7 @@ class Assembler(object):
     def encode(self, asm_instruction):
         asm_opcode, *asm_operands = asm_instruction
         machine_opcode = self.encode_opcode(asm_opcode)
-        target, source = 0, 0
+        target, source, target_op_mask, source_op_mask = 0, 0, 0, 0
         if len(asm_operands) > 0:
             target, target_op_mask = self.encode_operand(asm_operands[0])
         if len(asm_operands) > 1:

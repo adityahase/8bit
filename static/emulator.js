@@ -5,39 +5,57 @@ var App = new Vue({
             <div class="flex">
             <div class="w-1/2 h-screen">
                 <h3>Registers</h3>
-                <div>A: <input class="border" type="number" v-model.number="registers.A" /></div>
-                <div>B: <input class="border" type="number" v-model.number="registers.B" /></div>
+                <div v-for="(m, i) in states[current].registers">
+                    {{i}} : <input class="border" type="number" v-model.number="states[current].registers[i]" />
+                </div>
+                <div>A: <input class="border" type="number" v-model.number="states[current].registers.A" /></div>
                 <h3>Memory</h3>
-                <div v-for="(m, i) in memory">
-                    M : <input class="border" type="number" v-model.number="memory[i]" />
+                <div v-for="(m, i) in states[current].memory">
+                    M : <input class="border" type="number" v-model.number="states[current].memory[i]" />
                 </div>
             </div>
             <div class="w-1/2 bg-grey-lighter h-screen">
                 <div @click="setState(h)" v-for="h in history">
-                {{ h.instruction }}
+                {{ h.program }}
                 </div>
-                <input class="border" type="text" @keydown.enter="submit">
+                <textarea class="border" cols="40" rows="10" @keydown.enter="submit"></textarea>
             </div>
             </div>
         </div>
     `,
     data() {
         return {
-            registers: {
-                A: 0,
-                B: 0
-            },
-            memory: [0, 0, 0, 0],
+            states: [
+                {
+                    registers: {
+                        A: 0,
+                        B: 0
+                    },
+                    memory: [0, 0, 0, 0],
+                    }
+                ],
+            current: 0,
             history: []
         }
     },
+    async mounted() {
+        const res = await fetch('/emulate', {
+            method: 'POST',
+            body: "{}"
+        });
+        if (res.ok) {
+            const response = await res.json();
+            this.states = response;
+        }
+
+    },
     methods: {
         async submit(e) {
-            const instruction = e.target.value;
+            const program = e.target.value;
             const state = {
-                registers: this.registers,
-                memory: this.memory,
-                program: [instruction]
+                registers: this.states[this.current].registers,
+                memory: this.states[this.current].memory,
+                program: program
             };
             const res = await fetch('/emulate', {
                 method: 'POST',
@@ -49,7 +67,7 @@ var App = new Vue({
                 this.registers = laststate.registers;
                 this.memory = laststate.memory;
                 this.history.push({
-                    instruction,
+                    program,
                     state: {
                         registers: laststate.registers,
                         memory: laststate.memory

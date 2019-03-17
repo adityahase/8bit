@@ -36,6 +36,24 @@ OPCODE_MAP = {
     "HLT": 0xF0
 }
 
+REVERSE_OPCODE_MAP = {
+    0x00: "NOP",
+    0x10: "ADD",
+    0x20: "AND",
+    0x30: "DEC",
+    0x40: "DIV",
+    0x50: "INC",
+    0x60: "JMP",
+    0x70: "JZ",
+    0x80: "MOV",
+    0x90: "MUL",
+    0xA0: "NEG",
+    0xB0: "SUB",
+    0xC0: "OR",
+    0xD0: "XOR",
+    0xF0: "HLT"
+}
+
 REGISTER_MAP = {
     "A": 0xF0,
     "B": 0xF1,
@@ -49,57 +67,100 @@ REGISTER_MAP = {
 
 OP_MASK_SIMPLE = 0x00
 OP_MASK_INDIRECT = 0x01
-OP_MASK_DATA = 0x02
 
 MEMORY_SIZE = 256
 
 class Emulator(object):
-    def __init__(self, memory, program, registers):
+    def __init__(self, memory=None, program=None, registers=None):
         self.memory = [0]*MEMORY_SIZE
         self.code = []
         for instruction in Assembler(program).assemble():
             self.code.extend(instruction)
-        self.memory[:len(self.code)] = self.code
+        for index, instruction in enumerate(self.code):
+            self.memory[index] = instruction
+
+    def registers(self):
+        return {key: self.memory[value] for key, value in REGISTER_MAP.items()}
 
     def run(self):
-        for instruction in self.machine_code:
-            opcode, operand1, operand2 = instruction
+        program_counter = REGISTER_MAP["PC"]
+        print(self.state())
+        while True:
+            pointer = self.memory[program_counter]
+            instruction = self.memory[pointer: pointer + 3]
+            opcode, target, source, target_mask, source_mask = self.decode(instruction)
+            function = {
+                "NOP": self.OP_NOP,
+                "ADD": self.OP_ADD,
+                "AND": self.OP_AND,
+                "DEC": self.OP_DEC,
+                "DIV": self.OP_DIV,
+                "INC": self.OP_INC,
+                "JMP": self.OP_JMP,
+                "JZ": self.OP_JZ,
+                "MOV": self.OP_MOV,
+                "MUL": self.OP_MUL,
+                "NEG": self.OP_NEG,
+                "SUB": self.OP_SUB,
+                "OR": self.OP_OR,
+                "XOR": self.OP_XOR,
+                "HLT": self.OP_HLT
+            }[REVERSE_OPCODE_MAP[opcode]]
+            function(self.resolve(target, target_mask), self.resolve(source, source_mask))
+            self.memory[program_counter] += 3
             yield self.state()
+
+    def OP_NOP(self, target, source):
+        pass
+
+
+    def resolve(self, value, mask):
+        return {
+            OP_MASK_SIMPLE: value,
+            OP_MASK_INDIRECT: self.memory[value]
+        }[mask]
+
+    def decode(self, instruction):
+        opcode, target, source = instruction
+        unmasked_opcode = opcode & 0xF0
+        opcode_mask = opcode & 0x0F
+        target_op_mask = opcode_mask & 0x0C >> 2
+        source_op_mask = opcode_mask & 0x03
+        return unmasked_opcode, target, source, target_op_mask, source_op_mask
+
 
     def state(self):
         return {
             "memory": self.memory,
-            "registers": self.registers
+            "registers": self.registers()
         }
 
 
-def Assembler():
+class Assembler(object):
     def __init__(self, program):
         self.program = program
 
     def assemble(self):
-        return [self.decode(instruction) for instruction in self.program]
+        return [self.encode(instruction) for instruction in self.program]
 
-    def decode(self, asm_instruction):
+    def encode(self, asm_instruction):
         asm_opcode, *asm_operands = asm_instruction
-        machine_opcode = decode_opcode(asm_opcode)
+        machine_opcode = self.encode_opcode(asm_opcode)
         target, source = 0, 0
         if len(asm_operands) > 0:
-            target, target_op_mask = decode_operand(asm_operands[0])
+            target, target_op_mask = self.encode_operand(asm_operands[0])
         if len(asm_operands) > 1:
-            source, source_op_mask = decode_operand(asm_operands[1])
-        opcode_mask = (0x08 | target_op_mask) | (0x00 | source_op_mask)
+            source, source_op_mask = self.encode_operand(asm_operands[1])
+        opcode_mask = (target_op_mask << 2) | source_op_mask
         masked_machine_opcode = machine_opcode | opcode_mask
         return (masked_machine_opcode, target, source)
 
-    def decode_opcode(self, opcode):
+    def encode_opcode(self, opcode):
         return OPCODE_MAP[opcode]
 
-    def decode_operand(self, value):
+    def encode_operand(self, value):
         if value.startswith("@"):
             return REGISTER_MAP[value[1:]], OP_MASK_INDIRECT
-        elif value.startswith("#"):
-            return int(value[1:], base=16), OP_MASK_DATA
         elif value in REGISTER_MAP.keys():
             return REGISTER_MAP[value], OP_MASK_SIMPLE
         else:

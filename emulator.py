@@ -72,12 +72,15 @@ MEMORY_SIZE = 256
 
 class Emulator(object):
     def __init__(self, memory=None, program=None, registers=None):
-        self.memory = [0]*MEMORY_SIZE
+        self.memory = memory if memory else [0]*MEMORY_SIZE
         self.code = []
         for instruction in Assembler(program).assemble():
             self.code.extend(instruction)
         for index, instruction in enumerate(self.code):
             self.memory[index] = instruction
+        if registers:
+            for name, value in registers.items():
+                self.memory[REGISTER_MAP[name]] = value
 
     def registers(self):
         return {key: self.memory[value] for key, value in REGISTER_MAP.items()}

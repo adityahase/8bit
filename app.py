@@ -11,6 +11,8 @@ def emulate():
         program = [i.split() for i in data["program"].split("\n") if i]
         emulator = Emulator(data["memory"], program, data["registers"])
         states = list(emulator.run())
+        if not states:
+            states = [emulattor.state()]
     else:
         states = [
             {
